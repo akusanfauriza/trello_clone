@@ -38,19 +38,21 @@
             background-color: #f8f9fa;
             transform: translateY(-2px);
         }
-        .sortable-ghost {
-            opacity: 0.4;
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-        .activity-item {
-            border-left: 3px solid #007bff;
-            background-color: #f8f9fa;
-            padding: 8px 12px;
-            margin-bottom: 8px;
-            border-radius: 4px;
+        .auth-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
     </style>
 </head>
 <body>
+    @if(!in_array(Route::currentRouteName(), ['login', 'register']))
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
             <a class="navbar-brand" href="{{ route('dashboard') }}">
@@ -71,9 +73,16 @@
             </div>
         </div>
     </nav>
+    @endif
 
     <main>
+        @if(in_array(Route::currentRouteName(), ['login', 'register']))
+        <div class="auth-container">
+            @yield('content')
+        </div>
+        @else
         @yield('content')
+        @endif
     </main>
 
     <!-- jQuery -->
