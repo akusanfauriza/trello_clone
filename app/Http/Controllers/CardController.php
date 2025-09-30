@@ -11,7 +11,10 @@ class CardController extends Controller
 {
     public function store(Request $request, CardList $list)
     {
-        $this->authorize('update', $list->board);
+        // Authorization check - PERBAIKAN: Gunakan policy atau manual check
+        if ($list->board->user_id !== Auth::id() && !$list->board->isMember(Auth::id())) {
+            abort(403);
+        }
 
         $request->validate([
             'title' => 'required|string|max:255',
@@ -28,28 +31,37 @@ class CardController extends Controller
             'user_id' => Auth::id()
         ]);
 
-        return response()->json($card->load(['user', 'members']), 201);
+        // Redirect back to board page instead of returning JSON
+        return redirect()->route('boards.show', $list->board->id)
+            ->with('success', 'Card created successfully!');
     }
 
     public function show(Card $card)
     {
-        $this->authorize('view', $card->board);
+        // Authorization check
+        if (!$card->list->board->is_public && 
+            $card->list->board->user_id !== Auth::id() && 
+            !$card->list->board->isMember(Auth::id())) {
+            abort(403);
+        }
 
-        $card->load([
-            'user',
-            'members',
-            'list.board',
-            'activities' => function($query) {
-                $query->orderBy('created_at', 'desc')->with('user');
-            }
-        ]);
+        $card->load(['user', 'members', 'list.board']);
 
-        return response()->json($card);
+        // Return JSON for AJAX requests, or view for normal requests
+        if (request()->wantsJson()) {
+            return response()->json($card);
+        }
+
+        // For normal requests, redirect to board
+        return redirect()->route('boards.show', $card->list->board->id);
     }
 
     public function update(Request $request, Card $card)
     {
-        $this->authorize('update', $card->board);
+        // Authorization check
+        if ($card->list->board->user_id !== Auth::id() && !$card->list->board->isMember(Auth::id())) {
+            abort(403);
+        }
 
         $request->validate([
             'title' => 'sometimes|required|string|max:255',
@@ -59,62 +71,75 @@ class CardController extends Controller
             'list_id' => 'sometimes|exists:lists,id'
         ]);
 
-        $oldValues = $card->toArray();
-
         $card->update($request->only(['title', 'description', 'due_date', 'position', 'list_id']));
 
-        // Log activity
-        if ($card->wasChanged()) {
-            ActivityController::logCardUpdate($card, $oldValues);
+        if (request()->wantsJson()) {
+            return response()->json(['success' => true, 'card' => $card->load(['user', 'members'])]);
         }
 
-        return response()->json($card->load(['user', 'members']));
+        return back()->with('success', 'Card updated successfully!');
     }
 
     public function destroy(Card $card)
     {
-        $this->authorize('update', $card->board);
-
-        $card->delete();
-
-        // Reorder remaining cards in the list
-        $list = $card->list;
-        $cards = $list->cards()->orderBy('position')->get();
-        
-        foreach ($cards as $index => $cardItem) {
-            $cardItem->update(['position' => $index]);
+        if ($card->list->board->user_id !== Auth::id()) {
+            abort(403);
         }
 
-        return response()->json(['message' => 'Card deleted successfully']);
+        $boardId = $card->list->board->id;
+        $card->delete();
+
+        if (request()->wantsJson()) {
+            return response()->json(['message' => 'Card deleted successfully']);
+        }
+
+        return redirect()->route('boards.show', $boardId)->with('success', 'Card deleted successfully!');
+    }
+
+    public function move(Request $request, Card $card)
+    {
+        $request->validate([
+            'list_id' => 'required|exists:lists,id',
+            'position' => 'required|integer'
+        ]);
+
+        $card->update([
+            'list_id' => $request->list_id,
+            'position' => $request->position
+        ]);
+
+        return response()->json(['success' => true]);
     }
 
     public function addMember(Request $request, Card $card)
     {
-        $this->authorize('update', $card->board);
+        // Authorization check
+        if ($card->list->board->user_id !== Auth::id() && !$card->list->board->isMember(Auth::id())) {
+            abort(403);
+        }
 
         $request->validate([
             'user_id' => 'required|exists:users,id'
         ]);
 
-        if (!$card->board->isMember($request->user_id)) {
-            return response()->json(['message' => 'User is not a board member'], 422);
+        if (!$card->list->board->isMember($request->user_id)) {
+            return back()->with('error', 'User is not a member of this board.');
         }
 
         $card->members()->syncWithoutDetaching([$request->user_id]);
 
-        ActivityController::logCardMemberAdd($card, $request->user_id);
-
-        return response()->json(['message' => 'Member added to card successfully']);
+        return back()->with('success', 'Member added to card successfully!');
     }
 
-    public function removeMember(Request $request, Card $card, $userId)
+    public function removeMember(Card $card, $userId)
     {
-        $this->authorize('update', $card->board);
+        // Authorization check
+        if ($card->list->board->user_id !== Auth::id() && !$card->list->board->isMember(Auth::id())) {
+            abort(403);
+        }
 
         $card->members()->detach($userId);
 
-        ActivityController::logCardMemberRemove($card, $userId);
-
-        return response()->json(['message' => 'Member removed from card successfully']);
+        return back()->with('success', 'Member removed from card successfully!');
     }
 }

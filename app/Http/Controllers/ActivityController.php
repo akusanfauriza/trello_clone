@@ -10,18 +10,6 @@ use Illuminate\Support\Facades\Auth;
 
 class ActivityController extends Controller
 {
-    public function index(Board $board)
-    {
-        $this->authorize('view', $board);
-
-        $activities = $board->activities()
-            ->with(['user', 'card'])
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        return response()->json($activities);
-    }
-
     public static function logCardUpdate(Card $card, array $oldValues)
     {
         $newValues = $card->toArray();
@@ -69,6 +57,17 @@ class ActivityController extends Controller
         Activity::create([
             'type' => 'card_member_removed',
             'description' => "removed {$user->name} from card",
+            'user_id' => Auth::id(),
+            'board_id' => $card->board->id,
+            'card_id' => $card->id
+        ]);
+    }
+
+    public static function logCardCreated(Card $card)
+    {
+        Activity::create([
+            'type' => 'card_created',
+            'description' => "created card \"{$card->title}\"",
             'user_id' => Auth::id(),
             'board_id' => $card->board->id,
             'card_id' => $card->id

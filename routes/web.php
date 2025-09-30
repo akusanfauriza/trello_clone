@@ -3,7 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BoardController;
-use App\Http\Controllers\ListController;
+use App\Http\Controllers\CardListController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\BoardMemberController;
 use App\Http\Controllers\CardMemberController;
@@ -44,12 +44,12 @@ Route::middleware('auth')->group(function () {
     Route::delete('/boards/{board}/members/{user}', [BoardMemberController::class, 'destroy'])->name('boards.members.destroy');
     
     // Lists
-    Route::post('/boards/{board}/lists', [ListController::class, 'store'])->name('lists.store');
-    Route::put('/lists/{list}', [ListController::class, 'update'])->name('lists.update');
-    Route::delete('/lists/{list}', [ListController::class, 'destroy'])->name('lists.destroy');
-    Route::post('/lists/reorder', [ListController::class, 'reorder'])->name('lists.reorder');
+    Route::post('/boards/{board}/lists', [CardListController::class, 'store'])->name('lists.store');
+    Route::put('/lists/{list}', [CardListController::class, 'update'])->name('lists.update');
+    Route::delete('/lists/{list}', [CardListController::class, 'destroy'])->name('lists.destroy');
+    Route::post('/lists/reorder', [CardListController::class, 'reorder'])->name('lists.reorder');
     
-    // Cards
+    // Cards - PERBAIKAN: Gunakan List model binding
     Route::post('/lists/{list}/cards', [CardController::class, 'store'])->name('cards.store');
     Route::get('/cards/{card}', [CardController::class, 'show'])->name('cards.show');
     Route::put('/cards/{card}', [CardController::class, 'update'])->name('cards.update');

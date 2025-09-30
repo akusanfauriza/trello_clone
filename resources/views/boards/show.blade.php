@@ -7,8 +7,8 @@
     <div class="container py-3">
         <div class="row align-items-center">
             <div class="col-md-8">
-                <h2 class="mb-1">{{ $board->name }}</h2>
-                <p class="mb-0 opacity-75">{{ $board->description }}</p>
+                <h2 class="mb-1 text-white">{{ $board->name }}</h2>
+                <p class="mb-0 text-white opacity-75">{{ $board->description }}</p>
             </div>
             <div class="col-md-4 text-end">
                 <div class="btn-group">
@@ -32,7 +32,7 @@
                     <h6 class="mb-0">{{ $list->name }}</h6>
                     @if($board->user_id === Auth::id())
                     <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-secondary" 
+                        <button class="btn btn-sm btn-outline-secondary edit-list-btn" 
                                 data-bs-toggle="modal" 
                                 data-bs-target="#editListModal"
                                 data-list-id="{{ $list->id }}"
@@ -53,9 +53,7 @@
                 <div class="card-body list-body" data-list-id="{{ $list->id }}">
                     @foreach($list->cards as $card)
                     <div class="card card-item mb-2" data-card-id="{{ $card->id }}">
-                        <div class="card-body py-2" data-bs-toggle="modal" 
-                             data-bs-target="#cardModal" 
-                             data-card-id="{{ $card->id }}">
+                        <div class="card-body py-2">
                             <h6 class="card-title mb-1">{{ $card->title }}</h6>
                             @if($card->description)
                             <p class="card-text small text-muted mb-1">
@@ -107,14 +105,13 @@
     </div>
 </div>
 
-<!-- Modals -->
+<!-- Include Modals -->
 @include('boards.modals.create-list')
 @include('boards.modals.edit-list')
 @include('boards.modals.create-card')
-@include('boards.modals.card-details')
-@include('boards.modals.edit-board')
 
 <!-- Activities Sidebar -->
+@if(isset($board->activities) && $board->activities->count() > 0)
 <div class="offcanvas offcanvas-end" tabindex="-1" id="activitiesOffcanvas">
     <div class="offcanvas-header">
         <h5 class="offcanvas-title">Activity</h5>
@@ -128,10 +125,6 @@
             <small class="text-muted">{{ $activity->created_at->diffForHumans() }}</small>
         </div>
         @endforeach
-        
-        @if($board->activities->isEmpty())
-        <p class="text-muted">No activity yet</p>
-        @endif
     </div>
 </div>
 
@@ -144,24 +137,25 @@
         <i class="fas fa-history"></i>
     </button>
 </div>
-@endsection
+@endif
 
-@push('scripts')
+<!-- Scripts langsung di view -->
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // Initialize Sortable for lists
-    new Sortable(document.getElementById('listsContainer'), {
-        animation: 150,
-        ghostClass: 'sortable-ghost',
-        onEnd: function(evt) {
-            // Handle list reordering
-            console.log('List moved', evt);
-        }
-    });
+    if (document.getElementById('listsContainer')) {
+        new Sortable(document.getElementById('listsContainer'), {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            onEnd: function(evt) {
+                console.log('List moved', evt);
+            }
+        });
+    }
 
     // Initialize Sortable for each list
-    $('.list-body').each(function() {
-        new Sortable(this, {
+    document.querySelectorAll('.list-body').forEach(function(listBody) {
+        new Sortable(listBody, {
             animation: 150,
             ghostClass: 'sortable-ghost',
             group: 'cards',
@@ -170,59 +164,51 @@ $(document).ready(function() {
                 const newListId = evt.to.dataset.listId;
                 
                 // Send AJAX request to update card list
-                $.ajax({
-                    url: `/cards/${cardId}`,
-                    method: 'PUT',
-                    data: {
-                        _token: '{{ csrf_token() }}',
+                fetch(`/cards/${cardId}/move`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({
                         list_id: newListId,
                         position: evt.newIndex
-                    },
-                    success: function(response) {
-                        console.log('Card moved successfully');
-                    },
-                    error: function(xhr) {
-                        console.error('Error moving card');
-                    }
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Card moved successfully');
+                })
+                .catch(error => {
+                    console.error('Error moving card:', error);
                 });
             }
         });
     });
 
-    // Card modal handler
-    $('#cardModal').on('show.bs.modal', function(event) {
-        const button = $(event.relatedTarget);
-        const cardId = button.data('card-id');
-        
-        // Load card details via AJAX
-        $.get(`/cards/${cardId}`, function(data) {
-            const modal = $(this);
-            modal.find('.modal-title').text(data.title);
-            modal.find('#cardDescription').val(data.description);
-            modal.find('#cardDueDate').val(data.due_date);
-            // Populate other fields...
+    // Edit list modal handler
+    document.querySelectorAll('.edit-list-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const listId = this.dataset.listId;
+            const listName = this.dataset.listName;
+            
+            document.getElementById('editListId').value = listId;
+            document.getElementById('editListName').value = listName;
+            document.getElementById('editListForm').action = `/lists/${listId}`;
         });
     });
 
-    // Edit list modal handler
-    $('#editListModal').on('show.bs.modal', function(event) {
-        const button = $(event.relatedTarget);
-        const listId = button.data('list-id');
-        const listName = button.data('list-name');
-        
-        const modal = $(this);
-        modal.find('#editListId').val(listId);
-        modal.find('#editListName').val(listName);
-    });
-
     // Create card modal handler
-    $('#createCardModal').on('show.bs.modal', function(event) {
-        const button = $(event.relatedTarget);
-        const listId = button.data('list-id');
-        
-        const modal = $(this);
-        modal.find('#cardListId').val(listId);
-    });
+    const createCardModal = document.getElementById('createCardModal');
+    if (createCardModal) {
+        createCardModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const listId = button.dataset.listId;
+            
+            document.getElementById('cardListId').value = listId;
+            document.getElementById('createCardForm').action = `/lists/${listId}/cards`;
+        });
+    }
 });
 </script>
-@endpush
+@endsection

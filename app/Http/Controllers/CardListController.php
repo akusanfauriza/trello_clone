@@ -7,11 +7,16 @@ use App\Models\CardList;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class ListController extends Controller
+class CardListController extends Controller
 {
-    public function store(Request $request, Board $board)
+    public function store(Request $request, $boardId)
     {
-        $this->authorize('update', $board);
+        $board = Board::findOrFail($boardId);
+        
+        // Authorization check
+        if ($board->user_id !== Auth::id() && !$board->members()->where('user_id', Auth::id())->where('role', 'admin')->exists()) {
+            abort(403);
+        }
 
         $request->validate([
             'name' => 'required|string|max:255'
@@ -19,50 +24,47 @@ class ListController extends Controller
 
         $position = $board->lists()->max('position') + 1;
 
-        $list = CardList::create([
+        CardList::create([
             'name' => $request->name,
             'board_id' => $board->id,
             'position' => $position
         ]);
 
-        return response()->json($list, 201);
+        return back()->with('success', 'List created successfully!');
     }
 
-    public function update(Request $request, CardList $list)
+    public function update(Request $request, $id)
     {
-        $this->authorize('update', $list->board);
+        $list = CardList::with('board')->findOrFail($id);
+        
+        if ($list->board->user_id !== Auth::id()) {
+            abort(403);
+        }
 
         $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'position' => 'sometimes|integer'
+            'name' => 'required|string|max:255'
         ]);
 
-        $list->update($request->only(['name', 'position']));
+        $list->update(['name' => $request->name]);
 
-        return response()->json($list);
+        return back()->with('success', 'List updated successfully!');
     }
 
-    public function destroy(CardList $list)
+    public function destroy($id)
     {
-        $this->authorize('update', $list->board);
+        $list = CardList::with('board')->findOrFail($id);
+        
+        if ($list->board->user_id !== Auth::id()) {
+            abort(403);
+        }
 
         $list->delete();
 
-        // Reorder remaining lists
-        $board = $list->board;
-        $lists = $board->lists()->orderBy('position')->get();
-        
-        foreach ($lists as $index => $listItem) {
-            $listItem->update(['position' => $index]);
-        }
-
-        return response()->json(['message' => 'List deleted successfully']);
+        return back()->with('success', 'List deleted successfully!');
     }
 
-    public function reorder(Request $request, Board $board)
+    public function reorder(Request $request)
     {
-        $this->authorize('update', $board);
-
         $request->validate([
             'lists' => 'required|array',
             'lists.*.id' => 'required|exists:lists,id',
@@ -70,9 +72,7 @@ class ListController extends Controller
         ]);
 
         foreach ($request->lists as $listData) {
-            CardList::where('id', $listData['id'])
-                    ->where('board_id', $board->id)
-                    ->update(['position' => $listData['position']]);
+            CardList::where('id', $listData['id'])->update(['position' => $listData['position']]);
         }
 
         return response()->json(['message' => 'Lists reordered successfully']);

@@ -5,13 +5,17 @@
                 <h5 class="modal-title">Create New Card</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form action="{{ route('cards.store') }}" method="POST">
+            <form id="createCardForm" method="POST">
                 @csrf
                 <input type="hidden" name="list_id" id="cardListId">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Card Title</label>
                         <input type="text" class="form-control" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description (Optional)</label>
+                        <textarea class="form-control" name="description" rows="3"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
