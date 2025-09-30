@@ -27,7 +27,7 @@ class CardController extends Controller
             'title' => $request->title,
             'description' => $request->description,
             'position' => $position,
-            'list_id' => $list->id,
+            'card_list_id' => $list->id,
             'user_id' => Auth::id()
         ]);
 

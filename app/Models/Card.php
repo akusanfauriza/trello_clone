@@ -14,7 +14,7 @@ class Card extends Model
         'description',
         'position',
         'due_date',
-        'list_id',
+        'card_list_id',
         'user_id'
     ];
 
